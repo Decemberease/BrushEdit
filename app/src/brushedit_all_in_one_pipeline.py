@@ -26,14 +26,17 @@ def BrushEdit_Pipeline(pipe,
     image_processor = VaeImageProcessor(vae_scale_factor=pipe.vae_scale_factor, do_convert_rgb=True)
     height_new, width_new = image_processor.get_default_height_width(original_image, height, width)
     mask_np = cv2.resize(mask_np, (width_new, height_new))[:,:,np.newaxis]
-    mask_blurred = cv2.GaussianBlur(mask_np*255, (21, 21), 0)/255
+    dilation_size = int(max(height_new, width_new) * 0.05)  # 计算膨胀的像素数
+    kernel = np.ones((dilation_size, dilation_size), np.uint8)  # 定义膨胀核
+    mask_dilated = cv2.dilate((mask_np * 255).astype(np.uint8), kernel, iterations=1)
+    mask_dilated = mask_dilated.astype(np.float32) / 255.0
+    mask_blurred = cv2.GaussianBlur(mask_dilated*255, (21, 21), 0)/255
     mask_blurred = mask_blurred[:, :, np.newaxis]
-
     original_image = cv2.resize(original_image, (width_new, height_new))
 
-    init_image = original_image * (1 - mask_np)
+    init_image = original_image * (1 - mask_dilated)
     init_image = Image.fromarray(init_image.astype(np.uint8)).convert("RGB")
-    mask_image = Image.fromarray((mask_np.repeat(3, -1) * 255).astype(np.uint8)).convert("RGB")
+    mask_image = Image.fromarray((mask_dilated.repeat(3, -1) * 255).astype(np.uint8)).convert("RGB")
 
     brushnet_conditioning_scale = float(control_strength)
     

@@ -9,7 +9,7 @@ from diffusers import StableDiffusionBrushNetPipeline, BrushNetModel, UniPCMulti
 torch_dtype = torch.float16
 device = "cpu"
 
-BrushEdit_path = "models/"
+BrushEdit_path = "/data1/models/"
 if not os.path.exists(BrushEdit_path):
     BrushEdit_path = snapshot_download(
         repo_id="TencentARC/BrushEdit",
@@ -37,23 +37,23 @@ base_models_list = [
     # },
     {
         "name": "henmixReal (Preload)",
-        "local_path": "models/base_model/henmixReal_v5c",
+        "local_path": "/data1/models/base_model/henmixReal_v5c",
         "pipe": StableDiffusionBrushNetPipeline.from_pretrained(
-            "models/base_model/henmixReal_v5c", brushnet=brushnet, torch_dtype=torch_dtype, low_cpu_mem_usage=False
+            "/data1/models/base_model/henmixReal_v5c", brushnet=brushnet, torch_dtype=torch_dtype, low_cpu_mem_usage=False
         ).to(device)
     },
     {
         "name": "meinamix (Preload)",
-        "local_path": "models/base_model/meinamix_meinaV11",
+        "local_path": "/data1/models/base_model/meinamix_meinaV11",
         "pipe": StableDiffusionBrushNetPipeline.from_pretrained(
-            "models/base_model/meinamix_meinaV11", brushnet=brushnet, torch_dtype=torch_dtype, low_cpu_mem_usage=False
+            "/data1/models/base_model/meinamix_meinaV11", brushnet=brushnet, torch_dtype=torch_dtype, low_cpu_mem_usage=False
         ).to(device)
     },
     {
         "name": "realisticVision (Default)",
-        "local_path": "models/base_model/realisticVisionV60B1_v51VAE",
+        "local_path": "/data1/models/base_model/realisticVisionV60B1_v51VAE",
         "pipe": StableDiffusionBrushNetPipeline.from_pretrained(
-            "models/base_model/realisticVisionV60B1_v51VAE", brushnet=brushnet, torch_dtype=torch_dtype, low_cpu_mem_usage=False
+            "/data1/models/base_model/realisticVisionV60B1_v51VAE", brushnet=brushnet, torch_dtype=torch_dtype, low_cpu_mem_usage=False
         ).to(device)
     },
 ]

@@ -5,11 +5,11 @@ import numpy as np
 import requests
 import torch
 
-
+import whisper
 import gradio as gr
 
 from PIL import Image
-
+from pydub import AudioSegment
 
 from huggingface_hub import hf_hub_download, snapshot_download
 from scipy.ndimage import binary_dilation, binary_erosion
@@ -301,7 +301,7 @@ DEFAULT_ASPECT_RATIO = ASPECT_RATIO_LABELS[0]
 ## init device
 try:
     if torch.cuda.is_available():
-        device = "cuda"
+        device = "cuda:0"
     elif sys.platform == "darwin" and torch.backends.mps.is_available():
         device = "mps"
     else:
@@ -309,6 +309,8 @@ try:
 except:
     device = "cpu"
 
+device0 = "cuda:0"
+device1 = "cuda:1"
 # ## init torch dtype
 # if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
 #     torch_dtype = torch.bfloat16
@@ -323,7 +325,7 @@ torch_dtype = torch.float16
 
 
 # download hf models
-BrushEdit_path = "models/"
+BrushEdit_path = "/data1/models/"
 if not os.path.exists(BrushEdit_path):
     BrushEdit_path = snapshot_download(
         repo_id="TencentARC/BrushEdit",
@@ -334,7 +336,7 @@ if not os.path.exists(BrushEdit_path):
 ## init default VLM
 vlm_type, vlm_local_path, vlm_processor, vlm_model = vlms_template[DEFAULT_VLM_MODEL_NAME]
 if vlm_processor != "" and vlm_model != "":
-    vlm_model.to(device)
+    vlm_model.to("cuda:1")
 else:
     raise gr.Error("Please Download default VLM model "+ DEFAULT_VLM_MODEL_NAME +" first.")
 
@@ -360,13 +362,13 @@ pipe.enable_model_cpu_offload()
 
 ## init SAM
 sam = build_sam(checkpoint=sam_path)
-sam.to(device=device)
+sam.to(device="cuda:1")
 sam_predictor = SamPredictor(sam)
 sam_automask_generator = SamAutomaticMaskGenerator(sam)
 
 ## init groundingdino_model
 config_file = 'app/utils/GroundingDINO_SwinT_OGC.py'
-groundingdino_model = load_grounding_dino_model(config_file, groundingdino_path, device=device)
+groundingdino_model = load_grounding_dino_model(config_file, groundingdino_path, device="cuda:1")
 
 ## Ordinary function
 def crop_and_resize(image: Image.Image, 
@@ -522,7 +524,7 @@ def update_vlm_model(vlm_name):
     ## we recommend using preload models, otherwise it will take a long time to download the model. you can edit the code via vlm_template.py
     if vlm_type == "llava-next":
         if vlm_processor != "" and vlm_model != "":
-            vlm_model.to(device)
+            vlm_model.to("cuda:1")
             return vlm_model_dropdown
         else:
             if os.path.exists(vlm_local_path):
@@ -546,7 +548,7 @@ def update_vlm_model(vlm_name):
                     vlm_model = LlavaNextForConditionalGeneration.from_pretrained("llava-hf/llava-next-72b-hf", torch_dtype="auto", device_map="auto")
     elif vlm_type == "qwen2-vl":
         if vlm_processor != "" and vlm_model != "":
-            vlm_model.to(device)
+            vlm_model.to("cuda:1")
             return vlm_model_dropdown
         else:
             if os.path.exists(vlm_local_path):
@@ -575,7 +577,7 @@ def update_base_model(base_model_name):
         torch.cuda.empty_cache()
     base_model_path, pipe = base_models_template[base_model_name]
     if pipe != "":
-        pipe.to(device)
+        pipe.to("cuda:0")
     else:
         if os.path.exists(base_model_path):
             pipe = StableDiffusionBrushNetPipeline.from_pretrained(
@@ -693,7 +695,7 @@ def process(input_image,
         pass
     else:
         try:
-            category = vlm_response_editing_type(vlm_processor, vlm_model, original_image, prompt, device)
+            category = vlm_response_editing_type(vlm_processor, vlm_model, original_image, prompt, "cuda:1")
         except Exception as e:
             raise gr.Error("Please select the correct VLM model and input the correct API Key first!")
     
@@ -708,7 +710,7 @@ def process(input_image,
                                                 original_image,
                                                 category, 
                                                 prompt,
-                                                device)
+                                                "cuda:1")
 
             original_mask = vlm_response_mask(vlm_processor,
                                             vlm_model,
@@ -720,7 +722,7 @@ def process(input_image,
                                             sam_predictor,
                                             sam_automask_generator,
                                             groundingdino_model,
-                                            device).astype(np.uint8)
+                                            "cuda:1").astype(np.uint8)
         except Exception as e:
             raise gr.Error("Please select the correct VLM model and input the correct API Key first!")
 
@@ -738,14 +740,14 @@ def process(input_image,
                                                                     vlm_model, 
                                                                     original_image,
                                                                     prompt,
-                                                                    device)
+                                                                    "cuda:1")
         except Exception as e:
             raise gr.Error("Please select the correct VLM model and input the correct API Key first!")
 
-    generator = torch.Generator(device).manual_seed(random.randint(0, 2147483647) if randomize_seed else seed)
+    generator = torch.Generator("cuda:0").manual_seed(random.randint(0, 2147483647) if randomize_seed else seed)
 
 
-    with torch.autocast(device):
+    with torch.autocast("cuda"):
         image, mask_image, mask_np, init_image_np = BrushEdit_Pipeline(pipe, 
                                     prompt_after_apply_instruction,
                                     original_mask,
@@ -786,7 +788,7 @@ def generate_target_prompt(input_image,
                                                             vlm_model, 
                                                             original_image,
                                                             prompt,
-                                                            device)
+                                                            "cuda:1")
     return prompt_after_apply_instruction
 
 
@@ -809,14 +811,14 @@ def process_mask(input_image,
         original_image = input_image["background"]
 
     if input_mask.max() == 0:
-        category = vlm_response_editing_type(vlm_processor, vlm_model, original_image, prompt, device)
+        category = vlm_response_editing_type(vlm_processor, vlm_model, original_image, prompt, "cuda:1")
 
         object_wait_for_edit = vlm_response_object_wait_for_edit(vlm_processor, 
                                                                 vlm_model, 
                                                                 original_image,
                                                                 category, 
                                                                 prompt,
-                                                                device)
+                                                                "cuda:1")
         # original mask: h,w,1 [0, 255]
         original_mask = vlm_response_mask(
                                 vlm_processor,
@@ -829,7 +831,7 @@ def process_mask(input_image,
                                 sam_predictor,
                                 sam_automask_generator,
                                 groundingdino_model,
-                                device).astype(np.uint8)
+                                "cuda:1").astype(np.uint8)
     else:
         original_mask = input_mask.astype(np.uint8)
         category = None
@@ -1437,6 +1439,7 @@ def reset_func(input_image,
                original_mask, 
                prompt, 
                target_prompt, 
+               audio_prompt
                ):
     input_image = None
     original_image = None
@@ -1446,9 +1449,10 @@ def reset_func(input_image,
     masked_gallery = []
     result_gallery = []
     target_prompt = ''
+    audio_prompt = ''
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    return input_image, original_image, original_mask, prompt, mask_gallery, masked_gallery, result_gallery, target_prompt, True, False
+    return input_image, original_image, original_mask, prompt, mask_gallery, masked_gallery, result_gallery, target_prompt, True, False, audio_prompt
 
 
 def update_example(example_type, 
@@ -1472,8 +1476,52 @@ def update_example(example_type,
     aspect_ratio = "Custom resolution"
     example_change_times += 1
     return input_image, prompt, original_image, original_mask, mask_gallery, masked_gallery, result_gallery, aspect_ratio, "", False, example_change_times
+# 定义语音识别函数
+def recognize_speech_with_whisper(audio_file):
+    # 使用 Whisper 进行语音识别
+    result = whisper_model.transcribe(audio_file)
+    return result["text"]
 
+# 定义更新 prompt 的函数
+def update_prompt_with_audio(audio_file, current_prompt):
+    # 如果 audio_file 存在，则进行语音识别
+    if not audio_file.endswith(".wav"):
+        audio_file = convert_to_wav(audio_file)
+    if audio_file is not None:
+        recognized_text = recognize_speech_with_whisper(audio_file)
+        if recognized_text:
+            return recognized_text, f"🎤 识别结果: {recognized_text}"
+    # 如果 audio_file 不存在，则保留当前 prompt
+    return current_prompt, "🎤 未录入语音"
+# 定义初始化图像的函数
+def init_img(input_image, init_type, prompt, aspect_ratio, example_change_times):
+    # 这里是初始化图像的逻辑
+    # 例如：处理图像并返回相关状态
+    return input_image, None, None, prompt, [], [], [], "", init_type, aspect_ratio, True, False, example_change_times
+# 定义目标生成函数
+def generate_target(input_image, original_image, prompt, **kwargs):
+    # 这里是目标生成的逻辑
+    # 例如：调用某个模型生成目标
+    target_prompt = f"生成的目标: {prompt}"
+    return target_prompt
 
+def run_process(audio_file, input_image, original_image, prompt, **kwargs):
+    # 如果 audio_file 存在，则更新 prompt
+    if audio_file is not None:
+        prompt, _ = update_prompt_with_audio(audio_file, prompt)
+    
+    # 调用目标生成函数
+    target_prompt = generate_target(input_image, original_image, prompt, **kwargs)
+    
+    # 返回生成的目标
+    return target_prompt
+def convert_to_wav(audio_file):
+    # 读取音频文件
+    audio = AudioSegment.from_file(audio_file)
+    # 转换为 wav 格式
+    wav_file = audio_file.replace(".mp3", ".wav")  # 替换文件扩展名
+    audio.export(wav_file, format="wav")
+    return wav_file
 block = gr.Blocks(
         theme=gr.themes.Soft(
              radius_size=gr.themes.sizes.radius_none,
@@ -1514,6 +1562,7 @@ with block as demo:
                     )
 
             prompt = gr.Textbox(label="⌨️ Instruction", placeholder="Please input your instruction.", value="",lines=1)
+            audio_prompt = gr.Audio(label="🎤 Voice Input", type="filepath")
             run_button = gr.Button("💫 Run")
             
             vlm_model_dropdown = gr.Dropdown(label="VLM model", choices=VLM_MODEL_NAMES, value=DEFAULT_VLM_MODEL_NAME, interactive=True)
@@ -1647,8 +1696,14 @@ with block as demo:
         [input_image, init_type, prompt, aspect_ratio, example_change_times],
         [input_image, original_image, original_mask, prompt, mask_gallery, masked_gallery, result_gallery, target_prompt, init_type, aspect_ratio, resize_default, invert_mask_state, example_change_times]
     ) 
+    audio_prompt.change(
+        fn=update_prompt_with_audio, 
+        inputs=[audio_prompt, prompt], 
+        outputs=[prompt]
+    )
     example_type.change(fn=update_example, inputs=[example_type, prompt, example_change_times], outputs=[input_image, prompt, original_image, original_mask, mask_gallery, masked_gallery, result_gallery, aspect_ratio, target_prompt, invert_mask_state, example_change_times])
     
+
     ## vlm and base model dropdown
     vlm_model_dropdown.change(fn=update_vlm_model, inputs=[vlm_model_dropdown], outputs=[status])
     base_model_dropdown.change(fn=update_base_model, inputs=[base_model_dropdown], outputs=[status])
@@ -1674,7 +1729,8 @@ with block as demo:
          target_prompt,
          resize_default,
          aspect_ratio,
-         invert_mask_state]
+         invert_mask_state,
+         ]
 
     ## run brushedit
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery, mask_gallery, masked_gallery, prompt, target_prompt, invert_mask_state])
@@ -1695,7 +1751,7 @@ with block as demo:
     generate_target_prompt_button.click(fn=generate_target_prompt, inputs=[input_image, original_image, prompt], outputs=[target_prompt])
     
     ## reset func
-    reset_button.click(fn=reset_func, inputs=[input_image, original_image, original_mask, prompt, target_prompt], outputs=[input_image, original_image, original_mask, prompt, mask_gallery, masked_gallery, result_gallery, target_prompt, resize_default, invert_mask_state])
+    reset_button.click(fn=reset_func, inputs=[input_image, original_image, original_mask, prompt, target_prompt, audio_prompt], outputs=[input_image, original_image, original_mask, prompt, mask_gallery, masked_gallery, result_gallery, target_prompt, resize_default, invert_mask_state, audio_prompt])
     
 ## if have a localhost access error, try to use the following code
 # demo.launch(server_name="0.0.0.0", server_port=12345)

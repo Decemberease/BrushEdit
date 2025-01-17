@@ -31,15 +31,15 @@ vlms_list = [
     {
         "type": "llava-next",
         "name": "llama3-llava-next-8b-hf (Preload)",
-        "local_path": "models/vlms/llama3-llava-next-8b-hf",
+        "local_path": "/data1/models/vlms/llama3-llava-next-8b-hf",
         "processor": LlavaNextProcessor.from_pretrained(
-            "models/vlms/llama3-llava-next-8b-hf"
-        ) if os.path.exists("models/vlms/llama3-llava-next-8b-hf") else LlavaNextProcessor.from_pretrained(
+            "/data1/models/vlms/llama3-llava-next-8b-hf"
+        ) if os.path.exists("/data1/models/vlms/llama3-llava-next-8b-hf") else LlavaNextProcessor.from_pretrained(
             "llava-hf/llama3-llava-next-8b-hf"
         ),
         "model": LlavaNextForConditionalGeneration.from_pretrained(
-            "models/vlms/llama3-llava-next-8b-hf", torch_dtype=torch_dtype, device_map=device
-        ).to("cpu") if os.path.exists("models/vlms/llama3-llava-next-8b-hf") else 
+            "/data1/models/vlms/llama3-llava-next-8b-hf", torch_dtype=torch_dtype, device_map=device
+        ).to("cpu") if os.path.exists("/data1/models/vlms/llama3-llava-next-8b-hf") else 
             LlavaNextForConditionalGeneration.from_pretrained(
                 "llava-hf/llama3-llava-next-8b-hf", torch_dtype=torch_dtype, device_map=device
             ).to("cpu"),
@@ -95,15 +95,15 @@ vlms_list = [
     {
         "type": "qwen2-vl",
         "name": "Qwen2-VL-7B-Instruct (Default)",
-        "local_path": "models/vlms/Qwen2-VL-7B-Instruct",
+        "local_path": "/data1/models/vlms/Qwen2-VL-7B-Instruct",
         "processor": Qwen2VLProcessor.from_pretrained(
-            "models/vlms/Qwen2-VL-7B-Instruct"
-        ) if os.path.exists("models/vlms/Qwen2-VL-7B-Instruct") else Qwen2VLProcessor.from_pretrained(
+            "/data1/models/vlms/Qwen2-VL-7B-Instruct"
+        ) if os.path.exists("/data1/models/vlms/Qwen2-VL-7B-Instruct") else Qwen2VLProcessor.from_pretrained(
             "Qwen/Qwen2-VL-7B-Instruct"
         ),
         "model": Qwen2VLForConditionalGeneration.from_pretrained(
-            "models/vlms/Qwen2-VL-7B-Instruct", torch_dtype=torch_dtype, device_map=device
-        ).to("cpu") if os.path.exists("models/vlms/Qwen2-VL-7B-Instruct") else 
+            "/data1/models/vlms/Qwen2-VL-7B-Instruct", torch_dtype=torch_dtype, device_map=device
+        ).to("cpu") if os.path.exists("/data1/models/vlms/Qwen2-VL-7B-Instruct") else 
             Qwen2VLForConditionalGeneration.from_pretrained(
                 "Qwen/Qwen2-VL-7B-Instruct", torch_dtype=torch_dtype, device_map=device
             ).to("cpu"),
